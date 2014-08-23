@@ -1,0 +1,141 @@
+Practical Machine Learning Project Write up
+--------------------------------------------------
+
+We first consider the dataset and see what are the variables which are being used in the model. We note that many of the elements being used are actually descriptive statistics of the observations done for every window of the data. Also these descriptive statistics ( like average, max, min, amplitude, skewness, kurtosis, standard deviation, variance) are present for only a few of the rows - i.e. rows which are having new_window=yes. We omit all those columns which are these statistical observations for our predictions. 
+
+
+```{r message=FALSE}
+# set up environment
+library(lattice)
+library(caret)
+library(rattle)
+library(randomForest)
+library(cvTools)
+library(png)
+library(grid)
+library(rpart.plot)
+library(RColorBrewer)
+library(rpart)
+# remove statistics columns
+pml.training <- read.csv("C:/SujoyRc/Temp/Coursera/pml-training.csv")
+pml.testing <- read.csv("C:/SujoyRc/Temp/Coursera/pml-testing.csv")
+```
+
+For simplicity of coding we create a new dataset removing these columns.We can also confirm that none of the other columns will have any NAs (and thus no rows will be excluded from our analysis)
+
+```{r message=FALSE}
+cols_exclude_pattern<-c("max","min","skewness","kurtosis","avg","var","stddev","amplitude")
+pml_use<-pml.training[ , -grep(paste(cols_exclude_pattern,collapse="|"),names(pml.training))]
+apply(pml_use, 2, function(x) length(which(is.na(x))))
+summary(pml_use$new_window)
+```
+
+One question is how distribution of the columns differ for  new_window=yes as against new_window=no values - this is to be confident that there is nothing specific about these rows in that they will need to be excluded from the analysis or some special treatment is required. We plot a few of these  and see that there is not much difference between them visually. 
+
+```{r eval=FALSE}
+transparentTheme (trans = .9)
+featurePlot(x = pml_use[, 8:59],
+            y = pml_use$new_window,
+            plot = "density",
+            ## Pass in options to xyplot() to 
+            ## make it prettier
+            scales = list(x = list(relation="free"),
+                          y = list(relation="free")),
+            adjust = 1.5,
+            pch = "|",
+            layout = c(9, 6),
+            auto.key = list(columns = 52))
+```
+
+```{r echo=FALSE}
+img<-readPNG("C:/SujoyRc/Temp/Coursera/VariableDensities.png")
+grid.raster(img)
+```
+
+To start our modelling, we must split the data into testing and training sets - strictly speaking the testing dataset is an out-of-sample set as it does not have the response variable in it.
+
+```{r message=FALSE}
+set.seed(12345)
+inTrain<-createDataPartition(y=pml_use$classe,p=0.7,list=FALSE)
+training<-pml_use[inTrain,]
+testing<-pml_use[-inTrain,]
+### List all columns into one single variable
+fmla<-as.formula(paste("classe ~",paste(names(pml_use[8:59]),collapse=" + ")))
+```
+
+We start with a RPART model and see the performance. 
+```{r eval=FALSE}
+modFit<-train(fmla, method="rpart",data=training)
+```
+
+```{r echo=FALSE}
+load("C:/SujoyRc/Temp/Coursera/modFit")
+```
+
+```{r fig.width=7, fig.height=6}
+fancyRpartPlot(modFit$finalModel)
+```
+
+And see the model fit statistics both for in-sample and out of sample errors.
+
+**IN-SAMPLE ERRORS**
+```{r message=FALSE}
+confusionMatrix(training$classe,predict(modFit))
+```
+
+**OUT OF SAMPLE ERRORS**
+```{r message=FALSE}
+confusionMatrix(testing$classe,predict(modFit,newdata=testing))
+```
+
+These two results show a match of only 60% approximately - clearly it is not good enough. We attempt a Random Forest result for the same and note the variable importance in a plot.
+
+For simplicity we assign the randomForest object in the train model into a separate model. This will be useful as we will be using randomForest package functions for variable importance plots and cross-validation.
+
+```{r eval=FALSE}
+modFit_rf<-train(fmla, method="rf",data=training)
+rf<-modFit_rf$finalModel
+```
+
+```{r echo=FALSE}
+load("C:/SujoyRc/Temp/Coursera/rf_model")
+rf<-modFit_rf$finalModel
+```
+
+And visualize the node importance in the following plot
+
+```{r fig.width=7, fig.height=6 }
+varImpPlot(rf,type=2,main="mean decrease in node impurity")
+```
+
+And the confusion matrices are analyzed
+
+**IN-SAMPLE ERRORS**
+```{r message=FALSE}
+confusionMatrix(training$classe,predict(modFit_rf))
+```
+
+The confusion matrix for the training dataset gives a result of 100% which creates some concerns if this data is overfitted.
+
+**OUT OF SAMPLE ERRORS**
+```{r message=FALSE}
+confusionMatrix(testing$classe,predict(modFit_rf,newdata=testing))
+```
+
+However the confusion matrix for the testing dataset belies those fears and it is sufficient.
+
+```{r eval=FALSE }
+cv_results<-rfcv(pml_use[,8:59],pml_use[,60])
+cv_results<-rfcv(pml_use[,8:59],pml_use[,60],cv.fold=19622)
+```
+
+```{r echo=FALSE }
+load("C:/SujoyRc/Temp/Coursera/cv_results")
+```
+
+```{r fig.width=7, fig.height=6 }
+with(cv_results, plot(n.var, error.cv, log="x", type="o", lwd=2))
+```
+
+
+These results, all encouraging, allow us to choose the random forest as a model of choice for this problem.
