@@ -6,6 +6,7 @@ We first consider the dataset and see what are the variables which are being use
 
 ```{r message=FALSE}
 # set up environment
+options(warn=-1)
 library(lattice)
 library(caret)
 library(rattle)
@@ -124,18 +125,22 @@ confusionMatrix(testing$classe,predict(modFit_rf,newdata=testing))
 
 However the confusion matrix for the testing dataset belies those fears and it is sufficient.
 
+We then run a cross-validation and observer the out-of-sample errors for trees involving 1,3,6,13,26,52 variables.
+
 ```{r eval=FALSE }
 cv_results<-rfcv(pml_use[,8:59],pml_use[,60])
-cv_results<-rfcv(pml_use[,8:59],pml_use[,60],cv.fold=19622)
+cv_results$error.cv
 ```
 
 ```{r echo=FALSE }
 load("C:/SujoyRc/Temp/Coursera/cv_results")
+cv_results$error.cv
 ```
 
 ```{r fig.width=7, fig.height=6 }
 with(cv_results, plot(n.var, error.cv, log="x", type="o", lwd=2))
 ```
 
+The errrors are very small and provide a good estimae of out-of-sample errors.
 
 These results, all encouraging, allow us to choose the random forest as a model of choice for this problem.

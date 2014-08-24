@@ -7,58 +7,15 @@ We first consider the dataset and see what are the variables which are being use
 
 ```r
 # set up environment
+options(warn=-1)
 library(lattice)
 library(caret)
-```
-
-```
-## Warning: package 'caret' was built under R version 3.1.1
-```
-
-```r
 library(rattle)
-```
-
-```
-## Warning: package 'rattle' was built under R version 3.1.1
-```
-
-```r
 library(randomForest)
-```
-
-```
-## Warning: package 'randomForest' was built under R version 3.1.1
-```
-
-```r
 library(cvTools)
-```
-
-```
-## Warning: package 'cvTools' was built under R version 3.1.1
-## Warning: package 'robustbase' was built under R version 3.1.1
-```
-
-```r
 library(png)
-```
-
-```
-## Warning: package 'png' was built under R version 3.1.1
-```
-
-```r
 library(grid)
 library(rpart.plot)
-```
-
-```
-## Warning: package 'rpart.plot' was built under R version 3.1.1
-## Warning: package 'rpart' was built under R version 3.1.1
-```
-
-```r
 library(RColorBrewer)
 library(rpart)
 # remove statistics columns
@@ -180,10 +137,6 @@ And see the model fit statistics both for in-sample and out of sample errors.
 
 ```r
 confusionMatrix(training$classe,predict(modFit))
-```
-
-```
-## Warning: package 'e1071' was built under R version 3.1.1
 ```
 
 ```
@@ -367,13 +320,19 @@ confusionMatrix(testing$classe,predict(modFit_rf,newdata=testing))
 
 However the confusion matrix for the testing dataset belies those fears and it is sufficient.
 
+We then run a cross-validation and observer the out-of-sample errors for trees involving 1,3,6,13,26,52 variables.
+
 
 ```r
 cv_results<-rfcv(pml_use[,8:59],pml_use[,60])
-cv_results<-rfcv(pml_use[,8:59],pml_use[,60],cv.fold=19622)
+cv_results$error.cv
 ```
 
 
+```
+##       52       26       13        6        3        1 
+## 0.003618 0.004994 0.007135 0.038732 0.105035 0.592906
+```
 
 
 ```r
@@ -382,5 +341,6 @@ with(cv_results, plot(n.var, error.cv, log="x", type="o", lwd=2))
 
 ![plot of chunk unnamed-chunk-18](figure/unnamed-chunk-18.png) 
 
+The errrors are very small and provide a good estimae of out-of-sample errors.
 
 These results, all encouraging, allow us to choose the random forest as a model of choice for this problem.
